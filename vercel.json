@@ -3,6 +3,10 @@
     {
       "source": "/api/(.*)",
       "destination": "https://reptrack-pf4j.onrender.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
