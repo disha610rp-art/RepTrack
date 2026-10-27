@@ -1,0 +1,12 @@
+{
+  "name": "reptrack-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RepTrack - Smart Workout Planner with Progressive Overload & 1RM Engine",
+  "scripts": {
+    "install-all": "npm install --prefix server && npm install --prefix client",
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client",
+    "seed": "npm run seed --prefix server"
+  }
+}
