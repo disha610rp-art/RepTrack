@@ -4,9 +4,11 @@ import { useWorkout } from '../context/WorkoutContext';
 export const RestTimer = () => {
   const {
     restTimer,
+    timerQueue,
     pauseRestTimer,
     resumeRestTimer,
     stopRestTimer,
+    advanceRestTimer,
     addRestSeconds,
   } = useWorkout();
 
@@ -42,7 +44,7 @@ export const RestTimer = () => {
         />
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <div
             style={{
@@ -60,11 +62,25 @@ export const RestTimer = () => {
             ⏱️
           </div>
           <div>
-            <div className="text-xs text-amber font-bold uppercase tracking-wider">
-              {restTimer.targetLabel || 'Rest Period'}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber font-bold uppercase tracking-wider">
+                {restTimer.targetLabel || 'Rest Period'}
+              </span>
+              {timerQueue?.length > 0 && (
+                <span className="badge badge-purple text-[10px] font-mono font-bold" style={{ padding: '0.1rem 0.4rem' }}>
+                  +{timerQueue.length} Pending in Queue
+                </span>
+              )}
             </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {formatted}
+            <div className="flex items-baseline gap-2">
+              <div className="text-2xl font-black font-mono text-white tracking-tight">
+                {formatted}
+              </div>
+              {timerQueue?.length > 0 && (
+                <span className="text-xs text-secondary truncate max-w-[150px]">
+                  Next: {timerQueue[0]?.targetLabel}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -98,11 +114,20 @@ export const RestTimer = () => {
             </button>
           )}
 
-          {/* Skip */}
+          {/* Next / Skip */}
+          <button
+            onClick={advanceRestTimer}
+            className="btn btn-sm btn-secondary font-mono text-xs"
+            title={timerQueue?.length > 0 ? "Skip current rest & advance to next queued timer" : "Complete rest"}
+          >
+            {timerQueue?.length > 0 ? "⏭ Next" : "✓ Done"}
+          </button>
+
+          {/* Clear All */}
           <button
             onClick={stopRestTimer}
             className="btn btn-sm btn-secondary text-red"
-            title="Skip Rest"
+            title="Cancel timer & clear queue"
           >
             ✕
           </button>

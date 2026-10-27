@@ -17,6 +17,8 @@ export const ActiveWorkout = () => {
     cancelWorkout,
     openPlateModal,
     startWorkout,
+    startRestTimer,
+    advanceRestTimer,
   } = useWorkout();
 
   const navigate = useNavigate();
@@ -29,6 +31,46 @@ export const ActiveWorkout = () => {
   const [showAddExModal, setShowAddExModal] = useState(false);
   const [exerciseSearch, setExerciseSearch] = useState('');
   const [finishing, setFinishing] = useState(false);
+
+  const completedVolume = (activeSession?.exercises || []).reduce((acc, ex) => {
+    const setsVol = (ex.sets || [])
+      .filter(s => !s.isWarmup && s.completed && !s.pending)
+      .reduce((sum, s) => sum + (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0), 0);
+    return acc + setsVol;
+  }, 0);
+
+  const pendingVolume = (activeSession?.exercises || []).reduce((acc, ex) => {
+    const setsVol = (ex.sets || [])
+      .filter(s => !s.isWarmup && s.pending)
+      .reduce((sum, s) => sum + (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0), 0);
+    return acc + setsVol;
+  }, 0);
+
+  const handleToggleSetDone = (exerciseId, set) => {
+    const exIdStr = exerciseId?.toString();
+    const currentEx = activeSession?.exercises?.find(
+      e => (e.exerciseId?._id || e.exerciseId)?.toString() === exIdStr
+    );
+    const restTime = currentEx?.exerciseId?.defaultRestSeconds || 120;
+    const exName = currentEx?.exerciseId?.name || 'Rest';
+
+    if (set.completed) {
+      // Toggle off
+      updateLoggedSet(exIdStr, set._id, { completed: false, pending: false });
+    } else if (set.pending) {
+      // If clicked while in pending queue, immediately finalize as completed
+      updateLoggedSet(exIdStr, set._id, { completed: true, pending: false });
+      advanceRestTimer();
+    } else {
+      // New completion -> check if rest timer auto starts
+      if (user?.settings?.restTimerAutoStart) {
+        updateLoggedSet(exIdStr, set._id, { completed: false, pending: true });
+        startRestTimer(restTime, exName, { exerciseId: exIdStr, setId: set._id });
+      } else {
+        updateLoggedSet(exIdStr, set._id, { completed: true, pending: false });
+      }
+    }
+  };
 
   // Elapsed Workout Timer
   useEffect(() => {
@@ -120,8 +162,8 @@ export const ActiveWorkout = () => {
             <h1 className="text-2xl font-black text-white">{activeSession.workoutName}</h1>
           </div>
 
-          {/* Stopwatch Elapsed Timer */}
-          <div className="flex items-center gap-4">
+          {/* Stopwatch & Live Volume Bar */}
+          <div className="flex items-center gap-3 flex-wrap">
             <div
               style={{
                 backgroundColor: 'rgba(0,0,0,0.3)',
@@ -136,6 +178,38 @@ export const ActiveWorkout = () => {
                 {formatElapsed(elapsedSeconds)}
               </div>
             </div>
+
+            <div
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                padding: '0.5rem 1rem',
+                borderRadius: 12,
+                border: '1px solid var(--border-color)',
+                textAlign: 'center',
+              }}
+            >
+              <div className="text-[10px] text-muted font-bold uppercase tracking-wider">Completed Volume</div>
+              <div className="text-2xl font-black font-mono text-emerald">
+                {completedVolume} <span className="text-xs font-normal text-secondary">{activeSession.unit || unit}</span>
+              </div>
+            </div>
+
+            {pendingVolume > 0 && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: 12,
+                  border: '1px dashed #f59e0b',
+                  textAlign: 'center',
+                }}
+              >
+                <div className="text-[10px] text-amber font-bold uppercase tracking-wider">⏳ In Queue</div>
+                <div className="text-2xl font-black font-mono text-amber">
+                  +{pendingVolume} <span className="text-xs font-normal text-secondary">{activeSession.unit || unit}</span>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={handleFinish}
@@ -227,7 +301,9 @@ export const ActiveWorkout = () => {
                           style={{
                             borderBottom: '1px solid rgba(255,255,255,0.03)',
                             backgroundColor: set.completed
-                              ? 'rgba(16, 185, 129, 0.04)'
+                              ? 'rgba(16, 185, 129, 0.05)'
+                              : set.pending
+                              ? 'rgba(245, 158, 11, 0.07)'
                               : 'transparent',
                           }}
                         >
@@ -319,31 +395,44 @@ export const ActiveWorkout = () => {
                             )}
                           </td>
 
-                          {/* Completed Checkmark */}
+                          {/* Completed / Pending Button */}
                           <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                             <button
-                              onClick={() =>
-                                updateLoggedSet(exIdStr, set._id, {
-                                  completed: !set.completed,
-                                })
-                              }
+                              onClick={() => handleToggleSetDone(exIdStr, set)}
                               style={{
-                                width: 28,
+                                minWidth: set.pending ? 80 : 28,
                                 height: 28,
+                                padding: set.pending ? '0 0.4rem' : 0,
                                 borderRadius: 6,
                                 border: '2px solid',
-                                borderColor: set.completed ? '#10b981' : 'var(--border-color)',
-                                backgroundColor: set.completed ? '#10b981' : 'transparent',
-                                color: '#000',
+                                borderColor: set.completed
+                                  ? '#10b981'
+                                  : set.pending
+                                  ? '#f59e0b'
+                                  : 'var(--border-color)',
+                                backgroundColor: set.completed
+                                  ? '#10b981'
+                                  : set.pending
+                                  ? 'rgba(245, 158, 11, 0.2)'
+                                  : 'transparent',
+                                color: set.completed ? '#000' : set.pending ? '#fbbf24' : 'var(--text-muted)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontWeight: 900,
+                                fontWeight: 800,
+                                fontSize: set.pending ? '0.72rem' : '0.9rem',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s',
                               }}
+                              title={
+                                set.completed
+                                  ? 'Completed (Click to uncheck)'
+                                  : set.pending
+                                  ? 'Resting in Queue (Click to confirm completed now)'
+                                  : 'Click to complete set'
+                              }
                             >
-                              {set.completed && '✓'}
+                              {set.completed ? '✓' : set.pending ? '⏳ Pending' : ''}
                             </button>
                           </td>
 

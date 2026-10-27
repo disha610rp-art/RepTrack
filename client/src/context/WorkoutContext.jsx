@@ -18,14 +18,22 @@ export const WorkoutProvider = ({ children }) => {
     exerciseName: '',
   });
 
-  // Rest timer state
+  // Rest timer state & pending queue
   const [restTimer, setRestTimer] = useState({
     isActive: false,
     isPaused: false,
     remainingSeconds: 0,
     totalSeconds: 0,
     targetLabel: '',
+    exerciseId: null,
+    setId: null,
   });
+  const [timerQueue, setTimerQueue] = useState([]);
+  const timerQueueRef = React.useRef(timerQueue);
+
+  useEffect(() => {
+    timerQueueRef.current = timerQueue;
+  }, [timerQueue]);
 
   // Load active session from server when user is authenticated
   useEffect(() => {
@@ -49,7 +57,35 @@ export const WorkoutProvider = ({ children }) => {
     fetchActive();
   }, [isAuthenticated]);
 
-  // Rest Timer Interval
+  // Finalize set to completed state and sync
+  const finalizeSetCompleted = (exerciseId, setId) => {
+    if (!exerciseId || !setId) return;
+    setActiveSession(prev => {
+      if (!prev) return prev;
+      const updatedExercises = prev.exercises.map(ex => {
+        const exId = ex.exerciseId?._id || ex.exerciseId;
+        if (exId?.toString() !== exerciseId?.toString()) return ex;
+
+        const updatedSets = ex.sets.map(s => {
+          if (s._id?.toString() !== setId?.toString()) return s;
+          return { ...s, completed: true, pending: false };
+        });
+
+        return { ...ex, sets: updatedSets };
+      });
+      return { ...prev, exercises: updatedExercises };
+    });
+
+    if (activeSession?._id) {
+      api.put(`/sessions/${activeSession._id}/set`, {
+        exerciseId,
+        setId,
+        updates: { completed: true, pending: false },
+      }).catch(err => console.warn('Sync pending set completed error:', err.message));
+    }
+  };
+
+  // Rest Timer Interval with Pending Queue Support
   useEffect(() => {
     let timer = null;
     if (restTimer.isActive && !restTimer.isPaused && restTimer.remainingSeconds > 0) {
@@ -59,11 +95,36 @@ export const WorkoutProvider = ({ children }) => {
             if (user?.settings?.soundEnabled) {
               playTimerCompleteSound();
             }
+
+            // Finalize linked set to completed
+            if (prev.exerciseId && prev.setId) {
+              finalizeSetCompleted(prev.exerciseId, prev.setId);
+            }
+
+            // Check if another timer is in pending queue
+            const queue = timerQueueRef.current;
+            if (queue && queue.length > 0) {
+              const nextTimer = queue[0];
+              setTimerQueue(q => q.slice(1));
+              return {
+                isActive: true,
+                isPaused: false,
+                remainingSeconds: nextTimer.seconds,
+                totalSeconds: nextTimer.seconds,
+                targetLabel: nextTimer.targetLabel,
+                exerciseId: nextTimer.exerciseId,
+                setId: nextTimer.setId,
+              };
+            }
+
             return {
-              ...prev,
               isActive: false,
               isPaused: false,
               remainingSeconds: 0,
+              totalSeconds: 0,
+              targetLabel: '',
+              exerciseId: null,
+              setId: null,
             };
           }
 
@@ -82,21 +143,107 @@ export const WorkoutProvider = ({ children }) => {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [restTimer.isActive, restTimer.isPaused, restTimer.remainingSeconds, user]);
+  }, [restTimer.isActive, restTimer.isPaused, restTimer.remainingSeconds, user, activeSession?._id]);
 
-  const startRestTimer = (seconds, label = 'Rest') => {
-    setRestTimer({
-      isActive: true,
-      isPaused: false,
-      remainingSeconds: seconds,
-      totalSeconds: seconds,
-      targetLabel: label,
+  const startRestTimer = (seconds, label = 'Rest', metadata = {}) => {
+    setRestTimer(prev => {
+      // If a timer is already active and running, push to pending queue instead of dropping it!
+      if (prev.isActive && prev.remainingSeconds > 0) {
+        setTimerQueue(q => [
+          ...q,
+          {
+            id: `q-${Date.now()}-${Math.random()}`,
+            seconds,
+            totalSeconds: seconds,
+            targetLabel: label,
+            exerciseId: metadata.exerciseId || null,
+            setId: metadata.setId || null,
+          },
+        ]);
+        return prev;
+      }
+
+      return {
+        isActive: true,
+        isPaused: false,
+        remainingSeconds: seconds,
+        totalSeconds: seconds,
+        targetLabel: label,
+        exerciseId: metadata.exerciseId || null,
+        setId: metadata.setId || null,
+      };
     });
+  };
+
+  const advanceRestTimer = () => {
+    // Finalize current active timer's set
+    if (restTimer.exerciseId && restTimer.setId) {
+      finalizeSetCompleted(restTimer.exerciseId, restTimer.setId);
+    }
+
+    const queue = timerQueueRef.current;
+    if (queue && queue.length > 0) {
+      const nextTimer = queue[0];
+      setTimerQueue(q => q.slice(1));
+      setRestTimer({
+        isActive: true,
+        isPaused: false,
+        remainingSeconds: nextTimer.seconds,
+        totalSeconds: nextTimer.seconds,
+        targetLabel: nextTimer.targetLabel,
+        exerciseId: nextTimer.exerciseId,
+        setId: nextTimer.setId,
+      });
+    } else {
+      setRestTimer({
+        isActive: false,
+        isPaused: false,
+        remainingSeconds: 0,
+        totalSeconds: 0,
+        targetLabel: '',
+        exerciseId: null,
+        setId: null,
+      });
+    }
   };
 
   const pauseRestTimer = () => setRestTimer(prev => ({ ...prev, isPaused: true }));
   const resumeRestTimer = () => setRestTimer(prev => ({ ...prev, isPaused: false }));
-  const stopRestTimer = () => setRestTimer({ isActive: false, isPaused: false, remainingSeconds: 0, totalSeconds: 0, targetLabel: '' });
+  
+  const stopRestTimer = () => {
+    if (restTimer.exerciseId && restTimer.setId) {
+      finalizeSetCompleted(restTimer.exerciseId, restTimer.setId);
+    }
+    setTimerQueue([]);
+    setRestTimer({
+      isActive: false,
+      isPaused: false,
+      remainingSeconds: 0,
+      totalSeconds: 0,
+      targetLabel: '',
+      exerciseId: null,
+      setId: null,
+    });
+  };
+
+  const removeSetFromQueue = (exerciseId, setId) => {
+    setTimerQueue(q =>
+      q.filter(
+        item =>
+          !(
+            item.exerciseId?.toString() === exerciseId?.toString() &&
+            item.setId?.toString() === setId?.toString()
+          )
+      )
+    );
+    if (
+      restTimer.exerciseId?.toString() === exerciseId?.toString() &&
+      restTimer.setId?.toString() === setId?.toString()
+    ) {
+      advanceRestTimer();
+    }
+  };
+
   const addRestSeconds = (sec) => setRestTimer(prev => ({
     ...prev,
     remainingSeconds: Math.max(0, prev.remainingSeconds + sec),
@@ -162,14 +309,14 @@ export const WorkoutProvider = ({ children }) => {
       return { ...prev, exercises: updatedExercises };
     });
 
-    // Auto-trigger rest timer if completed flipped to true
-    if (updates.completed === true && user?.settings?.restTimerAutoStart) {
+    // Auto-trigger rest timer and queue if set goes into pending state
+    if (updates.pending === true && user?.settings?.restTimerAutoStart) {
       const currentEx = activeSession.exercises.find(
         e => (e.exerciseId?._id || e.exerciseId)?.toString() === exerciseId?.toString()
       );
       const restTime = currentEx?.exerciseId?.defaultRestSeconds || 120;
       const exName = currentEx?.exerciseId?.name || 'Rest';
-      startRestTimer(restTime, exName);
+      startRestTimer(restTime, exName, { exerciseId, setId });
     }
 
     try {
@@ -277,9 +424,32 @@ export const WorkoutProvider = ({ children }) => {
       return evaluation;
     } catch (err) {
       console.error('Failed to complete session on server:', err);
+      const completedVol = (activeSession.exercises || []).reduce((acc, ex) => {
+        const sVol = (ex.sets || [])
+          .filter(s => !s.isWarmup && s.completed && !s.pending)
+          .reduce((sum, s) => sum + (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0), 0);
+        return acc + sVol;
+      }, 0);
+
+      const localSession = {
+        ...activeSession,
+        status: 'completed',
+        totalVolume: completedVol,
+        durationSeconds: Math.max(60, Math.round((Date.now() - new Date(activeSession.startedAt).getTime()) / 1000)),
+      };
+
       stopRestTimer();
       setActiveSession(null);
-      return null;
+
+      setSummaryModalResult({
+        session: localSession,
+        evaluation: {
+          totalVolume: completedVol,
+          recommendations: [],
+          prEvents: [],
+        },
+      });
+      return { totalVolume: completedVol };
     }
   };
 
@@ -300,6 +470,7 @@ export const WorkoutProvider = ({ children }) => {
         activeSession,
         loadingActive,
         restTimer,
+        timerQueue,
         plateModal,
         summaryModalResult,
         startWorkout,
@@ -313,6 +484,9 @@ export const WorkoutProvider = ({ children }) => {
         pauseRestTimer,
         resumeRestTimer,
         stopRestTimer,
+        advanceRestTimer,
+        finalizeSetCompleted,
+        removeSetFromQueue,
         addRestSeconds,
         openPlateModal,
         closePlateModal,

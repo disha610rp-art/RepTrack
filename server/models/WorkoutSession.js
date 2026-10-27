@@ -35,6 +35,10 @@ const loggedSetSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    pending: {
+      type: Boolean,
+      default: false,
+    },
     calculated1RM: {
       type: Number,
     },

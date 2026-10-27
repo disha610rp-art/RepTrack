@@ -16,9 +16,9 @@ export function evaluateSession(session, exercisesMap, currentStatesMap, unit = 
     const exercise = exercisesMap[exerciseIdStr];
     if (!exercise) continue;
 
-    // Working sets only (ignore warmups)
+    // Working sets only (ignore warmups and unfinalized pending sets)
     const workingSets = sessionExercise.sets.filter(
-      s => !s.isWarmup && s.completed && s.actualReps > 0 && s.actualWeight > 0
+      s => !s.isWarmup && s.completed && !s.pending && s.actualReps > 0 && s.actualWeight > 0
     );
     if (workingSets.length === 0) continue;
 
