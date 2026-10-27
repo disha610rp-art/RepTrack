@@ -326,6 +326,28 @@ export async function completeSession(req, res) {
       return res.status(404).json({ message: 'Active session not found' });
     }
 
+    const { notes, overallRpe, exercises: clientExercises } = req.body;
+
+    // Merge any client-tracked activeSeconds, pending state, and calculatedVolume
+    if (clientExercises && Array.isArray(clientExercises)) {
+      clientExercises.forEach(ce => {
+        const ceId = (ce.exerciseId?._id || ce.exerciseId)?.toString();
+        const targetEx = session.exercises.find(e => (e.exerciseId?._id || e.exerciseId)?.toString() === ceId);
+        if (targetEx && Array.isArray(ce.sets)) {
+          ce.sets.forEach(cs => {
+            const ts = targetEx.sets.id(cs._id);
+            if (ts) {
+              if (cs.actualSeconds !== undefined) ts.actualSeconds = cs.actualSeconds;
+              if (cs.targetSeconds !== undefined) ts.targetSeconds = cs.targetSeconds;
+              if (cs.calculatedVolume !== undefined) ts.calculatedVolume = cs.calculatedVolume;
+              if (cs.completed !== undefined) ts.completed = cs.completed;
+              if (cs.pending !== undefined) ts.pending = cs.pending;
+            }
+          });
+        }
+      });
+    }
+
     const durationSeconds = Math.max(
       60,
       Math.round((Date.now() - new Date(session.startedAt).getTime()) / 1000)

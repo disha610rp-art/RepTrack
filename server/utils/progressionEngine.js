@@ -16,16 +16,31 @@ export function evaluateSession(session, exercisesMap, currentStatesMap, unit = 
     const exercise = exercisesMap[exerciseIdStr];
     if (!exercise) continue;
 
-    // Working sets only (ignore warmups and unfinalized pending sets)
+    // Working sets (include completed sets, or sets that have elapsed seconds/pending activity)
     const workingSets = sessionExercise.sets.filter(
-      s => !s.isWarmup && s.completed && !s.pending && s.actualReps > 0 && s.actualWeight > 0
+      s => !s.isWarmup && (s.completed || s.pending || (s.actualSeconds && s.actualSeconds > 0)) && s.actualReps > 0 && s.actualWeight > 0
     );
     if (workingSets.length === 0) continue;
 
-    const exerciseVolume = workingSets.reduce(
-      (sum, s) => sum + s.actualWeight * s.actualReps,
-      0
-    );
+    let exerciseVolume = 0;
+    for (const s of workingSets) {
+      const fullVol = (s.actualWeight || 0) * (s.actualReps || 0);
+      let setVol = fullVol;
+
+      if (!s.completed && (s.actualSeconds > 0 || s.pending)) {
+        const sec = s.actualSeconds || 0;
+        const target = s.targetSeconds || 180;
+        const ratio = target > 0 ? Math.min(1, Math.max(0, sec / target)) : 1;
+        setVol = Math.round(fullVol * ratio);
+      } else if (s.completed && s.actualSeconds > 0 && s.targetSeconds > 0 && s.actualSeconds < s.targetSeconds) {
+        const ratio = Math.min(1, Math.max(0, s.actualSeconds / s.targetSeconds));
+        setVol = Math.round(fullVol * ratio);
+      }
+
+      s.calculatedVolume = setVol;
+      exerciseVolume += setVol;
+    }
+
     totalVolume += exerciseVolume;
 
     const currentState = updatedStates[exerciseIdStr] || {

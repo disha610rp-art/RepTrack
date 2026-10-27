@@ -33,16 +33,32 @@ export const ActiveWorkout = () => {
   const [finishing, setFinishing] = useState(false);
 
   const completedVolume = (activeSession?.exercises || []).reduce((acc, ex) => {
-    const setsVol = (ex.sets || [])
-      .filter(s => !s.isWarmup && s.completed && !s.pending)
-      .reduce((sum, s) => sum + (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0), 0);
+    const setsVol = (ex.sets || []).reduce((sum, s) => {
+      if (s.isWarmup) return sum;
+      const fullVol = (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0);
+      if (s.completed && (!s.actualSeconds || s.actualSeconds >= (s.targetSeconds || 180))) {
+        return sum + fullVol;
+      }
+      if (s.actualSeconds > 0) {
+        const target = s.targetSeconds || 180;
+        const ratio = target > 0 ? Math.min(1, Math.max(0, s.actualSeconds / target)) : 1;
+        return sum + Math.round(fullVol * ratio);
+      }
+      if (s.completed) return sum + fullVol;
+      return sum;
+    }, 0);
     return acc + setsVol;
   }, 0);
 
   const pendingVolume = (activeSession?.exercises || []).reduce((acc, ex) => {
-    const setsVol = (ex.sets || [])
-      .filter(s => !s.isWarmup && s.pending)
-      .reduce((sum, s) => sum + (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0), 0);
+    const setsVol = (ex.sets || []).reduce((sum, s) => {
+      if (s.isWarmup || !s.pending) return sum;
+      const fullVol = (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0);
+      const target = s.targetSeconds || 180;
+      const remainingSec = Math.max(0, target - (s.actualSeconds || 0));
+      const remainingRatio = target > 0 ? remainingSec / target : 0;
+      return sum + Math.round(fullVol * remainingRatio);
+    }, 0);
     return acc + setsVol;
   }, 0);
 
@@ -428,11 +444,17 @@ export const ActiveWorkout = () => {
                                 set.completed
                                   ? 'Completed (Click to uncheck)'
                                   : set.pending
-                                  ? 'Resting in Queue (Click to confirm completed now)'
+                                  ? `Active for ${set.actualSeconds || 0}s (Click to confirm complete now)`
                                   : 'Click to complete set'
                               }
                             >
-                              {set.completed ? '✓' : set.pending ? '⏳ Pending' : ''}
+                              {set.completed
+                                ? '✓'
+                                : set.pending
+                                ? set.actualSeconds > 0
+                                  ? `⏳ ${set.actualSeconds}s`
+                                  : '⏳ Pending'
+                                : ''}
                             </button>
                           </td>
 

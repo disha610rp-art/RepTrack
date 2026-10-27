@@ -85,12 +85,40 @@ export const WorkoutProvider = ({ children }) => {
     }
   };
 
-  // Rest Timer Interval with Pending Queue Support
+  // Rest Timer Interval with Pending Queue & Active Seconds Calculation
   useEffect(() => {
     let timer = null;
     if (restTimer.isActive && !restTimer.isPaused && restTimer.remainingSeconds > 0) {
       timer = setInterval(() => {
         setRestTimer(prev => {
+          // Increment actualSeconds on the active set every resumed second
+          if (prev.exerciseId && prev.setId) {
+            setActiveSession(currSession => {
+              if (!currSession) return currSession;
+              const updatedExercises = currSession.exercises.map(ex => {
+                const exId = ex.exerciseId?._id || ex.exerciseId;
+                if (exId?.toString() !== prev.exerciseId?.toString()) return ex;
+
+                const updatedSets = ex.sets.map(s => {
+                  if (s._id?.toString() !== prev.setId?.toString()) return s;
+                  const currentSec = (s.actualSeconds || 0) + 1;
+                  const targetSec = s.targetSeconds || prev.totalSeconds || 180;
+                  const fullVol = (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0);
+                  const ratio = targetSec > 0 ? Math.min(1, currentSec / targetSec) : 1;
+                  const calcVol = Math.round(fullVol * ratio);
+                  return {
+                    ...s,
+                    actualSeconds: currentSec,
+                    targetSeconds: targetSec,
+                    calculatedVolume: calcVol,
+                  };
+                });
+                return { ...ex, sets: updatedSets };
+              });
+              return { ...currSession, exercises: updatedExercises };
+            });
+          }
+
           if (prev.remainingSeconds <= 1) {
             if (user?.settings?.soundEnabled) {
               playTimerCompleteSound();
@@ -402,34 +430,62 @@ export const WorkoutProvider = ({ children }) => {
 
   const finishWorkout = async (notes, overallRpe) => {
     if (!activeSession) return null;
+
+    // Calculate volume based on completed sets and seconds active/resumed
+    const calculateSessionVolume = (exercises) => {
+      return (exercises || []).reduce((acc, ex) => {
+        const sVol = (ex.sets || []).reduce((sum, s) => {
+          if (s.isWarmup) return sum;
+          const fullVol = (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0);
+          if (s.completed && (!s.actualSeconds || s.actualSeconds >= (s.targetSeconds || 180))) {
+            return sum + fullVol;
+          }
+          if (s.actualSeconds > 0) {
+            const target = s.targetSeconds || 180;
+            const ratio = target > 0 ? Math.min(1, Math.max(0, s.actualSeconds / target)) : 1;
+            return sum + Math.round(fullVol * ratio);
+          }
+          if (s.completed) return sum + fullVol;
+          return sum;
+        }, 0);
+        return acc + sVol;
+      }, 0);
+    };
+
+    const calculatedTotalVol = calculateSessionVolume(activeSession.exercises);
+
     try {
       const res = await api.post(`/sessions/${activeSession._id}/complete`, {
         notes,
         overallRpe,
+        exercises: activeSession.exercises,
       });
 
       stopRestTimer();
       setActiveSession(null);
 
       const evaluation = res.data?.evaluation || { recommendations: [], prEvents: [] };
+      if (!evaluation.totalVolume || evaluation.totalVolume === 0) {
+        evaluation.totalVolume = calculatedTotalVol;
+      }
+
+      if (res.data?.session) {
+        res.data.session.totalVolume = evaluation.totalVolume;
+      }
+
       if (evaluation.prEvents?.length > 0 && user?.settings?.soundEnabled) {
         playPrFanfare();
       }
 
       setSummaryModalResult({
-        session: res.data?.session,
+        session: res.data?.session || { totalVolume: evaluation.totalVolume },
         evaluation,
       });
 
       return evaluation;
     } catch (err) {
       console.error('Failed to complete session on server:', err);
-      const completedVol = (activeSession.exercises || []).reduce((acc, ex) => {
-        const sVol = (ex.sets || [])
-          .filter(s => !s.isWarmup && s.completed && !s.pending)
-          .reduce((sum, s) => sum + (Number(s.actualWeight) || 0) * (Number(s.actualReps) || 0), 0);
-        return acc + sVol;
-      }, 0);
+      const completedVol = calculatedTotalVol;
 
       const localSession = {
         ...activeSession,

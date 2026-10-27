@@ -39,6 +39,18 @@ const loggedSetSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    actualSeconds: {
+      type: Number,
+      default: 0,
+    },
+    targetSeconds: {
+      type: Number,
+      default: 180,
+    },
+    calculatedVolume: {
+      type: Number,
+      default: 0,
+    },
     calculated1RM: {
       type: Number,
     },
