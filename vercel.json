@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://reptrack-pf4j.onrender.com/api/$1"
+    }
+  ]
+}
