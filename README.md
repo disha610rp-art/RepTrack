@@ -9,11 +9,33 @@
 - **Project Name:** RepTrack🏋️ — Smart Workout Planner
 - **Target Deadline:** 27 October 2026, 11:59 PM IST
 - **Official Submission Form:** [https://forms.gle/sBy4sfqyiRG2Zpom9](https://forms.gle/sBy4sfqyiRG2Zpom9)
+- **Live Production Application:** [https://reptrack-pi.vercel.app](https://reptrack-pi.vercel.app)
+- **Production Backend API:** [https://reptrack-pf4j.onrender.com/api/health](https://reptrack-pf4j.onrender.com/api/health)
+- **Project Walkthrough & Video Guide:** [Watch on Google Drive](https://drive.google.com/file/d/1v7T1LJeObpH1prl_URr0Phq3i5k_Zepv/view?usp=drivesdk)
+
+---
+
+## 🎥 Video Demonstration & User Guide
+
+> **This video walkthrough provides a comprehensive overview explaining the core architecture of RepTrack and serves as a step-by-step user guide on how to navigate and use every feature of the application.**
+
+[![RepTrack Video Walkthrough & User Guide](https://img.shields.io/badge/▶%20Watch%20RepTrack%20Walkthrough%20%26%20Guide-Google%20Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/file/d/1v7T1LJeObpH1prl_URr0Phq3i5k_Zepv/view?usp=drivesdk)
+
+🔗 **Direct Video Link:** [https://drive.google.com/file/d/1v7T1LJeObpH1prl_URr0Phq3i5k_Zepv/view?usp=drivesdk](https://drive.google.com/file/d/1v7T1LJeObpH1prl_URr0Phq3i5k_Zepv/view?usp=drivesdk)
+
+*What this video guide covers:*
+- **Project & Architectural Explanation:** Full tour of the tech stack, client routing, Express REST controllers, and MongoDB data model.
+- **Onboarding & Evaluation Login:** How to access the system with 1-click evaluator demo credentials with pre-seeded analytics and PR history.
+- **Interactive Workout Execution:** Live logging of sets, weights, and reps with instantaneous 1RM calculation across 6 sports-science formulas.
+- **Barbell Plate Visualizer:** Calculating exact Olympic sleeve plate stacks (color-coded) and warmup ladders.
+- **Rest Timer Queue & Volume Tracking:** Real-time rest intervals with active-training seconds volume accumulation.
+- **Automated Progressive Overload:** Demonstration of automatic weight increments (+2.5kg) upon hitting target reps and automated 10% deloading upon plateau detection.
 
 ---
 
 ## 📖 Table of Contents
 
+- [🎥 Video Demonstration & User Guide](#-video-demonstration--user-guide)
 1. [Problem Statement](#1-problem-statement)
 2. [Target Users](#2-target-users)
 3. [Solution & Product Philosophy](#3-solution--product-philosophy)
