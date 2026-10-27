@@ -19,6 +19,11 @@ export const ActiveWorkout = () => {
     startWorkout,
     startRestTimer,
     advanceRestTimer,
+    switchToSet,
+    markSetCompleted,
+    restTimer,
+    pauseRestTimer,
+    resumeRestTimer,
   } = useWorkout();
 
   const navigate = useNavigate();
@@ -310,6 +315,7 @@ export const ActiveWorkout = () => {
                   <tbody>
                     {sessionEx.sets.map((set, sIdx) => {
                       const estimated1RM = calculate1RM(set.actualWeight, set.actualReps, 'epley');
+                      const isCurrentActive = restTimer?.isActive && restTimer?.exerciseId === exIdStr && restTimer?.setId === set._id?.toString();
 
                       return (
                         <tr
@@ -318,8 +324,10 @@ export const ActiveWorkout = () => {
                             borderBottom: '1px solid rgba(255,255,255,0.03)',
                             backgroundColor: set.completed
                               ? 'rgba(16, 185, 129, 0.05)'
+                              : isCurrentActive
+                              ? 'rgba(16, 185, 129, 0.12)'
                               : set.pending
-                              ? 'rgba(245, 158, 11, 0.07)'
+                              ? 'rgba(245, 158, 11, 0.08)'
                               : 'transparent',
                           }}
                         >

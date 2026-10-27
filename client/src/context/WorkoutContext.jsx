@@ -173,6 +173,71 @@ export const WorkoutProvider = ({ children }) => {
     };
   }, [restTimer.isActive, restTimer.isPaused, restTimer.remainingSeconds, user, activeSession?._id]);
 
+  // Switch to or resume a specific set's timer seamlessly
+  const switchToSet = (exerciseId, setId, exerciseName = 'Rest') => {
+    if (!activeSession) return;
+    const exIdStr = exerciseId?.toString();
+    const setIdStr = setId?.toString();
+
+    let targetSet = null;
+    let targetEx = null;
+    activeSession.exercises.forEach(ex => {
+      const eId = (ex.exerciseId?._id || ex.exerciseId)?.toString();
+      if (eId === exIdStr) {
+        targetEx = ex;
+        const s = ex.sets.find(item => item._id?.toString() === setIdStr);
+        if (s) targetSet = s;
+      }
+    });
+
+    if (!targetSet) return;
+
+    const targetSec = targetSet.targetSeconds || targetEx?.exerciseId?.defaultRestSeconds || 180;
+    const actualSec = targetSet.actualSeconds || 0;
+    const remainingSec = Math.max(1, targetSec - actualSec);
+    const label = exerciseName || targetEx?.exerciseId?.name || 'Rest';
+
+    // Mark target set as pending in session
+    setActiveSession(prev => {
+      if (!prev) return prev;
+      const updatedExercises = prev.exercises.map(ex => {
+        const eId = (ex.exerciseId?._id || ex.exerciseId)?.toString();
+        if (eId !== exIdStr) return ex;
+        const updatedSets = ex.sets.map(s => {
+          if (s._id?.toString() !== setIdStr) return s;
+          return { ...s, pending: true, completed: false, targetSeconds: targetSec };
+        });
+        return { ...ex, sets: updatedSets };
+      });
+      return { ...prev, exercises: updatedExercises };
+    });
+
+    // Make this set active in the rest timer immediately
+    setRestTimer({
+      isActive: true,
+      isPaused: false,
+      remainingSeconds: remainingSec,
+      totalSeconds: targetSec,
+      targetLabel: label,
+      exerciseId: exIdStr,
+      setId: setIdStr,
+    });
+  };
+
+  const markSetCompleted = (exerciseId, setId) => {
+    const exIdStr = exerciseId?.toString();
+    const setIdStr = setId?.toString();
+
+    finalizeSetCompleted(exIdStr, setIdStr);
+
+    if (
+      restTimer.exerciseId?.toString() === exIdStr &&
+      restTimer.setId?.toString() === setIdStr
+    ) {
+      advanceRestTimer();
+    }
+  };
+
   const startRestTimer = (seconds, label = 'Rest', metadata = {}) => {
     setRestTimer(prev => {
       // If a timer is already active and running, push to pending queue instead of dropping it!
@@ -537,6 +602,8 @@ export const WorkoutProvider = ({ children }) => {
         finishWorkout,
         cancelWorkout,
         startRestTimer,
+        switchToSet,
+        markSetCompleted,
         pauseRestTimer,
         resumeRestTimer,
         stopRestTimer,

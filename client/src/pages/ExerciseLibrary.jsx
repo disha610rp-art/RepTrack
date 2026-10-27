@@ -19,7 +19,8 @@ export const ExerciseLibrary = () => {
   const [newRest, setNewRest] = useState(120);
 
   const muscles = ['All', 'Chest', 'Back', 'Shoulders', 'Quads', 'Hamstrings', 'Arms', 'Core'];
-  const equipment = ['All', 'Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight'];
+  const creationMuscles = ['Chest', 'Back', 'Shoulders', 'Arms', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Core', 'Full Body'];
+  const equipment = ['All', 'Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Kettlebell', 'Smith Machine'];
 
   useEffect(() => {
     async function load() {
@@ -76,7 +77,8 @@ export const ExerciseLibrary = () => {
         setNewInstructions('');
       }
     } catch (err) {
-      alert('Failed to create exercise: ' + err.message);
+      const msg = err.response?.data?.message || err.message;
+      alert('Failed to create exercise: ' + msg);
     }
   };
 
@@ -85,7 +87,7 @@ export const ExerciseLibrary = () => {
     const matchesMuscle =
       selectedMuscle === 'All' ||
       ex.primaryMuscle === selectedMuscle ||
-      (selectedMuscle === 'Arms' && (ex.primaryMuscle === 'Biceps' || ex.primaryMuscle === 'Triceps'));
+      (selectedMuscle === 'Arms' && (ex.primaryMuscle === 'Arms' || ex.primaryMuscle === 'Biceps' || ex.primaryMuscle === 'Triceps'));
     const matchesEquipment =
       selectedEquipment === 'All' || ex.category === selectedEquipment;
     return matchesSearch && matchesMuscle && matchesEquipment;
@@ -298,7 +300,7 @@ export const ExerciseLibrary = () => {
                     onChange={(e) => setNewPrimaryMuscle(e.target.value)}
                     style={{ width: '100%' }}
                   >
-                    {muscles.filter((m) => m !== 'All').map((m) => (
+                    {creationMuscles.map((m) => (
                       <option key={m} value={m}>
                         {m}
                       </option>

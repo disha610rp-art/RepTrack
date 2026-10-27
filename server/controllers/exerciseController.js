@@ -57,6 +57,9 @@ export async function createExercise(req, res) {
 
     res.status(201).json({ success: true, data: exercise });
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: error.message || 'Failed to create exercise' });
   }
 }

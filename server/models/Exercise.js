@@ -57,13 +57,13 @@ const exerciseSchema = new mongoose.Schema(
     },
     primaryMuscle: {
       type: String,
-      enum: ['Chest', 'Back', 'Shoulders', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Biceps', 'Triceps', 'Core', 'Full Body'],
+      enum: ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Biceps', 'Triceps', 'Core', 'Full Body'],
       required: true,
     },
     secondaryMuscles: [
       {
         type: String,
-        enum: ['Chest', 'Back', 'Shoulders', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Biceps', 'Triceps', 'Core', 'Full Body'],
+        enum: ['Chest', 'Back', 'Shoulders', 'Arms', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Biceps', 'Triceps', 'Core', 'Full Body'],
       },
     ],
     defaultRestSeconds: {

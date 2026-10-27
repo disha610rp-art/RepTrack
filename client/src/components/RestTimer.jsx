@@ -3,6 +3,7 @@ import { useWorkout } from '../context/WorkoutContext';
 
 export const RestTimer = () => {
   const {
+    activeSession,
     restTimer,
     timerQueue,
     pauseRestTimer,
@@ -10,6 +11,7 @@ export const RestTimer = () => {
     stopRestTimer,
     advanceRestTimer,
     addRestSeconds,
+    switchToSet,
   } = useWorkout();
 
   if (!restTimer.isActive) return null;
@@ -20,6 +22,31 @@ export const RestTimer = () => {
   const pct = restTimer.totalSeconds > 0
     ? Math.max(0, Math.min(100, (restTimer.remainingSeconds / restTimer.totalSeconds) * 100))
     : 0;
+
+  // Find other pending sets that can be switched to
+  const otherPendingSets = [];
+  (activeSession?.exercises || []).forEach(ex => {
+    const exId = (ex.exerciseId?._id || ex.exerciseId)?.toString();
+    const exName = ex.exerciseId?.name || 'Exercise';
+    (ex.sets || []).forEach(s => {
+      if (s.pending && !s.completed) {
+        const isActive =
+          restTimer?.isActive &&
+          restTimer?.exerciseId === exId &&
+          restTimer?.setId === s._id?.toString();
+        if (!isActive) {
+          otherPendingSets.push({
+            exerciseId: exId,
+            setId: s._id?.toString(),
+            exerciseName: exName,
+            setNumber: s.setNumber,
+            actualSeconds: s.actualSeconds || 0,
+            targetSeconds: s.targetSeconds || 180,
+          });
+        }
+      }
+    });
+  });
 
   return (
     <div className="rest-timer-bar">
@@ -76,12 +103,27 @@ export const RestTimer = () => {
               <div className="text-2xl font-black font-mono text-white tracking-tight">
                 {formatted}
               </div>
-              {timerQueue?.length > 0 && (
-                <span className="text-xs text-secondary truncate max-w-[150px]">
-                  Next: {timerQueue[0]?.targetLabel}
-                </span>
-              )}
+              <span className="text-xs text-muted font-mono">
+                ({restTimer.totalSeconds - restTimer.remainingSeconds}s elapsed)
+              </span>
             </div>
+
+            {otherPendingSets.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                <span className="text-[10px] text-muted font-bold uppercase tracking-wider">Switch to:</span>
+                {otherPendingSets.map(p => (
+                  <button
+                    key={p.setId}
+                    onClick={() => switchToSet(p.exerciseId, p.setId, p.exerciseName)}
+                    className="badge badge-purple hover:badge-amber text-[10px] font-mono cursor-pointer transition-all"
+                    style={{ padding: '0.15rem 0.45rem', borderRadius: 4 }}
+                    title={`Click to resume ${p.exerciseName} Set ${p.setNumber} (has ${p.actualSeconds}s)`}
+                  >
+                    ▶ {p.exerciseName} Set {p.setNumber} ({p.actualSeconds}s)
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

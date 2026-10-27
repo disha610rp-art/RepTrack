@@ -315,7 +315,7 @@ export async function addExerciseToSession(req, res) {
 // @route POST /api/sessions/:id/complete
 export async function completeSession(req, res) {
   try {
-    const { notes, overallRpe } = req.body;
+    const { notes, overallRpe, exercises: clientExercises } = req.body;
     const session = await WorkoutSession.findOne({
       _id: req.params.id,
       userId: req.user._id,
@@ -325,8 +325,6 @@ export async function completeSession(req, res) {
     if (!session) {
       return res.status(404).json({ message: 'Active session not found' });
     }
-
-    const { notes, overallRpe, exercises: clientExercises } = req.body;
 
     // Merge any client-tracked activeSeconds, pending state, and calculatedVolume
     if (clientExercises && Array.isArray(clientExercises)) {

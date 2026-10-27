@@ -55,7 +55,7 @@ export async function getAnalytics(req, res) {
         );
 
         const muscle = ex.primaryMuscle;
-        if (muscle === 'Biceps' || muscle === 'Triceps') {
+        if (muscle === 'Biceps' || muscle === 'Triceps' || muscle === 'Arms') {
           muscleVolumeMap.Arms = (muscleVolumeMap.Arms || 0) + exVolume;
         } else if (muscleVolumeMap[muscle] !== undefined) {
           muscleVolumeMap[muscle] += exVolume;
